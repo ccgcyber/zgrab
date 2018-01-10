@@ -295,8 +295,6 @@ func makeHTTPGrabber(config *Config, grabData *GrabData) func(string, string, st
 			fullURL = "http://" + urlHost + endpoint
 		}
 
-		var resp *http.Response
-
 		u, err := url.Parse(fullURL)
 		if err != nil {
 			return err
@@ -315,13 +313,20 @@ func makeHTTPGrabber(config *Config, grabData *GrabData) func(string, string, st
 			httpHost = hostWithoutPort
 		}
 
+		var req *http.Request
+		var resp *http.Response
+
 		switch config.HTTP.Method {
 		case "GET":
-			resp, err = client.GetWithHost(fullURL, httpHost)
+			req, err = http.NewRequestWithHost("GET", fullURL, httpHost, nil)
 		case "HEAD":
-			resp, err = client.HeadWithHost(fullURL, httpHost)
+			req, err = http.NewRequestWithHost("HEAD", fullURL, httpHost, nil)
 		default:
 			zlog.Fatalf("Bad HTTP Method: %s. Valid options are: GET, HEAD.", config.HTTP.Method)
+		}
+		if err == nil {
+			req.Header.Set("Accept", "*/*")
+			resp, err = client.Do(req)
 		}
 		if resp != nil && resp.Body != nil {
 			defer resp.Body.Close()
@@ -420,7 +425,9 @@ func makeGrabber(config *Config) func(*Conn) error {
 		if config.TLSVerbose {
 			c.SetTLSVerbose()
 		}
-
+		if config.TLSCertsOnly {
+			c.SetTLSCertsOnly()
+		}
 		if config.TLS {
 			if err := c.TLSHandshake(); err != nil {
 				c.erroredComponent = "tls"
